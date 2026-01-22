@@ -6,12 +6,13 @@ import numpy as np
 from uuid import uuid4
 from typing import List
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import FastAPI, UploadFile, Request, HTTPException
 from fastapi.responses import JSONResponse
-
+import requests
 from typing import List, Dict, Optional, Tuple
 from decimal import Decimal, ROUND_HALF_UP
 import re
@@ -21,8 +22,7 @@ import fitz  # PyMuPDF
 from fastapi.concurrency import run_in_threadpool
 import re
 from PIL import Image
-from paddleocr import PaddleOCR
-import paddle
+
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -44,7 +44,7 @@ class RecalculateRequest(BaseModel):
 
 # Initialize FastAPI app
 app = FastAPI()
-from fastapi.middleware.cors import CORSMiddleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -56,17 +56,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize PaddleOCR
-ocr_engine = PaddleOCR(
-    use_doc_orientation_classify=False,
-    use_doc_unwarping=False,
-    use_textline_orientation=False,
-    rec_batch_num=1,       # Set recognition batch size to 1
-    # use_gpu=True,          # Explicitly enable GPU
-    enable_mkldnn=False,   # Disable MKLDNN to avoid CPU fallback issues
-    precision="fp32",      # Use FP32 (default) or try "fp16" for lower memory usage
-    # det_max_side_len=960,  # Limit image size for detection to reduce memory
-)
 
 REGIONS = {
     "shipper": {'x1': 162, 'y1': 666, 'x2': 1438, 'y2': 960},
@@ -544,70 +533,6 @@ async def analysis_receipt(df):
     return data
 
 
-def extract_text_all_levels(image):
-    # (your original function – unchanged)
-    try:
-        result_data = ocr_engine.predict(input=image)[0]
-        predictions = {"lines": [], "words": [], "characters": []}
-
-        for poly, text, score, box_coords in zip(
-            result_data['dt_polys'],
-            result_data['rec_texts'],
-            result_data['rec_scores'],
-            result_data['rec_boxes']
-        ):
-            polygon = np.array(poly)
-            x_min, x_max = polygon[:, 0].min(), polygon[:, 0].max()
-            y_min, y_max = polygon[:, 1].min(), polygon[:, 1].max()
-
-            line_entry = {
-                "text": text,
-                "x": float(x_min),
-                "y": float(y_min),
-                "width": float(x_max - x_min),
-                "height": float(y_max - y_min),
-                "rotation": 0,
-                "score": float(score)
-            }
-            predictions["lines"].append(line_entry)
-
-            # word & char approximation (unchanged)
-            words = re.findall(r'\S+', text)
-            word_count = len(words)
-            if word_count > 0:
-                word_width = line_entry["width"] / word_count
-                for i, word in enumerate(words):
-                    word_entry = {
-                        "text": word,
-                        "x": float(x_min + i * word_width),
-                        "y": float(y_min),
-                        "width": float(word_width),
-                        "height": float(y_max - y_min),
-                        "rotation": 0,
-                        "score": float(score),
-                        "parent_line": line_entry["text"]
-                    }
-                    predictions["words"].append(word_entry)
-
-                    for j, char in enumerate(word):
-                        char_width = word_width / len(word)
-                        char_entry = {
-                            "text": char,
-                            "x": float(word_entry["x"] + j * char_width),
-                            "y": float(y_min),
-                            "width": float(char_width),
-                            "height": float(y_max - y_min),
-                            "rotation": 0,
-                            "score": float(score),
-                            "parent_word": word,
-                            "parent_line": line_entry["text"]
-                        }
-                        predictions["characters"].append(char_entry)
-
-        return predictions
-
-    finally:
-        paddle.device.cuda.empty_cache()
 
 
 def convert_pdf_to_images_gfs(pdf_bytes, zoom=4):
@@ -656,6 +581,40 @@ def convert_pdf_to_images(pdf_bytes, zoom=4):
     return images
 
 
+
+
+def get_ocr_predictions(image, handwritten = False):
+
+    url = 'http://127.0.0.1:8000/extractocr'
+    print('Type of the image:', type(image))
+
+    # If the image is a numpy.ndarray, convert it to a PIL image
+    if isinstance(image, np.ndarray):
+        pil_image = Image.fromarray(image)
+    elif isinstance(image, Image.Image):
+        pil_image = image
+    else:
+        raise TypeError(f"Unsupported image type: {type(image)}")
+
+    # Convert the PIL image to bytes
+    img_bytes = io.BytesIO()
+    pil_image.save(img_bytes, format='PNG')
+    img_bytes.seek(0)
+
+    # Send to FastAPI OCR endpoint
+    files = {'files': ('image.png', img_bytes, 'image/png')}
+    response = requests.post(url, files=files)
+
+    if response.status_code == 200:
+        data = response.json()
+        if handwritten == False:
+            return data[0]['ocr_result']
+        elif handwritten == True:
+            return data[0]['ocr_result']
+    else:
+        raise Exception(f"OCR request failed: {response.status_code} - {response.text}")
+
+
 # Templates
 templates = Jinja2Templates(directory="templates")
 
@@ -697,8 +656,10 @@ async def extract_ocr(request: Request):
 
             if image:
                 image_np = np.array(image)
+                ocr_results = get_ocr_predictions(image_np)
+                print(ocr_results)
 
-                ocr_results = await extract_text_from_image(image_np)
+                # ocr_results = await extract_text_from_image(image_np)
 
                 # All extraction steps now awaited
                 extracted_text = await extract_fields_from_ocr(ocr_results["lines"], REGIONS)

@@ -151,7 +151,7 @@ body{
     <!-- HEADER -->
     <div class="text-end mb-3">
        
-         <img src="/static/assets/logo.png"
+         <img src="/exentec/static/assets/logo.png"
                  style="width:160px;">
         
     </div>
@@ -240,7 +240,7 @@ body{
     <div class="mt-5">
         <strong>For and on behalf of:<br>Exentec Singapore Pte Ltd</strong>
         <div class="mt-3">
-            <img src="/static/assets/sign.png"
+            <img src="/exentec/static/assets/sign.png"
                  style="width:90px;">
         </div>
         <div class="signature-area mt-2">Authorised Signature</div>
@@ -266,7 +266,7 @@ body{
             // If ROOT_PATH is empty, "/" or undefined, set to empty string
             if (!rootPathCookie || rootPathCookie === '/' || rootPathCookie === '' || rootPathCookie === '""') {
                 ROOT_PATH = "";
-                API_BASE = "http://localhost:8000";
+                API_BASE = "http://localhost:8003";
             } else {
                 // Production mode with proxy (e.g., /soa)
                 ROOT_PATH = rootPathCookie;
@@ -294,7 +294,7 @@ body{
             }
             return cookieValue;
         }
-        
+API_BASE = "https://payable.pixxa.tech:8080/exentec";
 let originalItems = [];
 let originalTotal = "";
 
