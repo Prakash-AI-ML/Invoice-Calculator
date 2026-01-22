@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Invoice OCR Preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Bootstrap -->
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{
+    background:#f1f5f9;
+    font-family: Arial, sans-serif;
+}
+
+/* LEFT PANEL */
+.drop-zone{
+    background:#fff;
+    border:2px dashed #cbd5e1;
+    border-radius:14px;
+    padding:30px;
+    text-align:center;
+    cursor:pointer;
+    transition:.3s;
+}
+.drop-zone:hover{
+    border-color:#4f46e5;
+    background:#eef2ff;
+}
+.drop-zone .icon{
+    font-size:40px;
+}
+
+/* A4 INVOICE */
+.invoice-wrapper{
+    display:flex;
+    justify-content:center;
+}
+.invoice-container{
+    width:210mm;
+    min-height:297mm;
+    background:#fff;
+    padding:12mm;
+    box-shadow:0 0 12px rgba(0,0,0,.15);
+    font-size:12px;
+}
+
+/* TABLES */
+.main-table,
+.items-table{
+    width:100%;
+    border-collapse:collapse;
+}
+.main-table td,
+.items-table th{
+    border:1px solid #000;
+    padding: 2px;
+}
+
+
+.items-table td{
+    border-top: 0px  solid #000 !important;
+    border-right: 1px solid  #000;
+    border-bottom: 0px solid  #000;
+    border-left: 1px solid  #000;
+    padding: 2px;
+}
+.title-cell{
+    text-align:center;
+    font-size:18px;
+    font-weight:bold;
+}
+.items-table th{
+    font-size:9px;
+    text-align:center;
+}
+.total-row td{
+    font-weight:bold;
+  border-top: 1px solid #000 !important;
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    border-left: 1px solid #000;
+    padding: 2px;
+}
+.text-right{text-align:right}
+.text-center{text-align:center}
+
+.signature-area{
+    width:260px;
+    border-top:1.5px solid #000;
+    margin-top:50px;
+    font-weight:bold;
+}
+.main-table,
+.items-table {
+    table-layout: fixed;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container-fluid">
+<div class="row g-4">
+
+<!-- LEFT SIDE -->
+<div class="col-lg-3">
+
+    <div class="drop-zone mb-3" id="dropZone" style="margin-top: 50px;">
+        <input type="file" id="fileInput" hidden accept=".xls,.xlsx,.csv,.jpg,.jpeg,.png,.pdf">
+        <div class="drop-content">
+            <div class="icon">📄</div>
+            <strong>Upload Invoice</strong>
+            <div class="text-muted small">Excel / PDF / Image</div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">View Split</label>
+        <input
+    type="number"
+    class="form-control"
+    id="splitInput"
+    step="any"
+    placeholder="Enter number to Divided by (*0 For Original)"
+    onblur="validateSplitValue(this)">
+
+        <!-- <select class="form-select" id="splitSelect">
+            <option value="original">Original</option>
+            <option value="3">Divide by 3</option>
+            <option value="5">Divide by 5</option>
+        </select> -->
+    </div>
+<div class="mb-3">
+    <button class="btn btn-primary w-100" onclick="downloadPDF()">
+        Download as PDF
+    </button>
+</div>
+
+</div>
+
+<!-- RIGHT SIDE -->
+<div class="col-lg-9">
+<div class="invoice-wrapper">
+<div class="invoice-container">
+
+    <!-- HEADER -->
+    <div class="text-end mb-3">
+       
+         <img src="https://pixxa.tech/exentec/logo.png"
+                 style="width:160px;">
+        
+    </div>
+
+    <table class="main-table mb-2">
+        <tr>
+            <td rowspan="2" width="58.5%">
+                <div id="shipper"></div>
+            </td>
+            <td class="title-cell">COMMERCIAL INVOICE</td>
+        </tr>
+        <tr>
+            <td style="    display: flex;
+    height: 46px;
+    width: 100.3%;
+    
+    border-top: 0px solid red !important;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+    border-left: 0px solid;">
+                <div style="width:50%;"><span id="refNo"></span></div>
+                <div style="width:50%;    text-align: end;"><span id="refDate"></span></div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div id="importer"></div>
+            </td>
+           
+
+                <td style="    display: flex;
+    height: 121px;
+    width: 100.3%;
+    
+    border-top: 0px solid red !important;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+    border-left: 0px solid;">
+                <div style="width:50%;"><span id="poNo"></span></div>
+                <div style="width:50%;    text-align: end;"><span id="poDate"></span></div>
+            </td>
+
+
+              
+        </tr>
+        <tr>
+            <td style="    border-bottom: 0px;">
+                <div id="shipTo"></div>
+            </td>
+             <td style="    display: flex;
+    height: 121px;
+    width: 100.3%;
+    
+    border-top: 0px solid red !important;
+    border-right: 1px solid;
+    border-bottom: 0px solid;
+    border-left: 0px solid;">
+                <div style="width:50%;"><span id="portLoading"></span></div>
+                <div style="width:50%;    text-align: left;"><span id="portDischarge"></span></div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ITEMS -->
+    <table class="items-table" style="margin-top: -9px;">
+        <thead>
+            <tr>
+                <th style="width:4%;">ITEM</th>
+                <th style="width:7%;">GPN</th>
+                <th style="width: 48.8%;">DESCRIPTION</th>
+                <th style="width:8%;">COUNTRY OF ORIGIN</th>
+                <th style="width:5%;">UOM</th>
+                <th style="width:7.5%;word-break: break-all;">QUANTITY</th>
+                <th style="width:11%;">FOB PRICE SGD</th>
+                <th style="width:11%;">FOB AMOUNT SGD</th>
+            </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+        <tr class="total-row">
+            <td colspan="7" class="text-right">TOTAL</td>
+            <td class="text-right">$ <span id="totalAmount"></span></td>
+        </tr>
+    </table>
+
+    <!-- FOOTER -->
+    <div class="mt-5">
+        <strong>For and on behalf of:<br>Exentec Singapore Pte Ltd</strong>
+        <div class="mt-3">
+            <img src="https://pixxa.tech/exentec/sign.png"
+                 style="width:90px;">
+        </div>
+        <div class="signature-area mt-2">Authorised Signature</div>
+    </div>
+
+    <div class="text-center mt-4">Page 1</div>
+
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<script>
+       let ROOT_PATH = "";
+        let API_BASE = "";
+
+        // Initialize ROOT_PATH and API_BASE from cookie
+        function initGlobalPaths() {
+            rootPathCookie = getCookie('root_path');
+            rootPathCookie = rootPathCookie.replace(/"/g, '')
+            // If ROOT_PATH is empty, "/" or undefined, set to empty string
+            if (!rootPathCookie || rootPathCookie === '/' || rootPathCookie === '' || rootPathCookie === '""') {
+                ROOT_PATH = "";
+                API_BASE = "http://localhost:8000";
+            } else {
+                // Production mode with proxy (e.g., /soa)
+                ROOT_PATH = rootPathCookie;
+                API_BASE = "https://payable.pixxa.tech:8080" + ROOT_PATH;
+            }
+            
+            console.log('=== GLOBAL PATH CONFIGURATION ===');
+            console.log('ROOT_PATH from cookie:', ROOT_PATH || '(empty - local mode)');
+            console.log('API_BASE:', API_BASE);
+            console.log('Current URL:', window.location.href);
+            console.log('Mode:', ROOT_PATH ? 'Production (Proxy)' : 'Local Development');
+            console.log('================================');
+        }
+          function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+let originalItems = [];
+let originalTotal = "";
+
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+
+dropZone.onclick = () => fileInput.click();
+fileInput.onchange = e => handleFile(e.target.files[0]);
+
+function handleFile(file){
+    if(!file) return;
+
+    dropZone.querySelector(".drop-content").innerHTML = `
+        <div class="icon">📊</div>
+        <strong>${file.name}</strong>
+        <div class="text-muted small">Uploading...</div>
+    `;
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    fetch(`${API_BASE}/extractocr`,{
+        method:"POST",
+        body:fd
+    })
+    .then(r=>r.json())
+    .then(api=>{
+        const d = api[0].responses;
+        originalItems = d.items;
+        // originalItems = d.items.filter(i=>i.item);
+        originalTotal = d.total;
+
+        shipper.innerHTML = d.shipper.replace(/\n/g,"<br>");
+        importer.innerHTML = d.importer_of_record.replace(/\n/g,"<br>");
+        shipTo.innerHTML = d.ship_to.replace(/\n/g,"<br>");
+
+       
+        portLoading.innerHTML = d.port_of_loading.replace(':', ':<br>');
+       
+         portDischarge.innerHTML = d.port_of_discharge.replace(':', ':<br>');
+        refNo.textContent = d.reference_no;
+        refDate.textContent = d.reference_date;
+        poNo.textContent = d.po_no;
+        poDate.textContent = d.po_no_date;
+
+        renderTable(originalItems, originalTotal);
+    });
+}
+
+splitInput.oninput = e=>{
+    if(e.target.value==="0"){
+        renderTable(originalItems, originalTotal);
+        return;
+    }
+    fetch(`${API_BASE}/recalculate`,{
+        method:"POST",
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            dividing_by:Number(e.target.value),
+            items:originalItems
+        })
+    })
+    .then(r=>r.json())
+    .then(r=>renderTable(r.items, r.total));
+};
+
+function renderTable(items,total){
+    
+    itemsBody.innerHTML="";
+    items.forEach(r=>{
+        itemsBody.insertAdjacentHTML("beforeend",`
+        <tr>
+            <td class="text-center">${r.item??""}</td>
+            <td class="text-center">${r.gpn||""}</td>
+            <td style="font-size:11px;${(r.gpn=="")?"text-decoration:underline":""}" class="pt-3" >${r.description.replace(/\n/g,"<br>")}</td>
+            <td class="text-center">${r.country_of_origin||((r.gpn=="")?"":"SG")}</td>
+            <td class="text-center">${r.uom||""}</td>
+            <td class="text-center">${parseInt(r.quantity)||""}</td>
+            <td class="text-right">
+                <table style="width:100%; border-collapse:collapse;border: none;">
+    <tr>
+        
+      <td style="text-align:right; width:90%;border: none;">${r.fob_price_sgd?"$  "+r.fob_price_sgd: ""}</td>
+    </tr>
+  </table>
+  </td>
+            <td class="text-right">
+                <table style="width:100%; border-collapse:collapse;border: none;">
+    <tr>
+        
+      <td style="text-align:right; width:90%;border: none;">${r.fob_amount_sgd?"$  "+r.fob_amount_sgd: ""}</td>
+    </tr>
+  </table>
+  </td>
+        </tr>`);
+    });
+    totalAmount.textContent = total;
+}
+function downloadPDF() {
+    const element = document.querySelector(".invoice-container");
+
+    const opt = {
+        margin:       0,
+        filename:     'commercial-invoice.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  {
+            scale: 2,
+            useCORS: true,
+            logging: false
+        },
+        jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+        }
+    };
+
+    html2pdf().set(opt).from(element).save();
+}
+function validateSplitValue(el) {
+    const value = Number(el.value);
+
+    if (value < 0) {
+        alert("Split value cannot be zero or negative.");
+        el.value = 0;
+    }
+}
+</script>
+
+
+</body>
+</html>
